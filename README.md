@@ -1,1 +1,1 @@
-# NDVI Change Detection 
+# ndvi-change-detection
