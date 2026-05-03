@@ -42,6 +42,9 @@ auth_response = requests.post(
         "password": PASSWORD,
     }
 )
+
+print("🚀 Script started...")
+
 token = auth_response.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}
 print("✅ Authenticated with Copernicus API")
@@ -379,3 +382,69 @@ m.get_root().html.add_child(folium.Element(title_html))
 m.save("ndvi_interactive_map.html")
 print("✅ Interactive map saved: ndvi_interactive_map.html")
 print("\n🎉 Project complete! All outputs saved.")
+
+import folium
+import numpy as np
+from matplotlib import cm
+from matplotlib.colors import Normalize
+import base64
+from io import BytesIO
+from PIL import Image
+
+# === Lightweight interactive map using WMS tiles ===
+center_lat = (47.1236 + 47.2739) / 2
+center_lon = (7.6300 + 7.8639) / 2
+
+m = folium.Map(location=[center_lat, center_lon], zoom_start=11,
+               tiles='CartoDB positron')
+
+# Convert NDVI change to small image (resize to reduce size)
+def ndvi_to_rgba_small(data, cmap_name='RdYlGn', vmin=-0.3, vmax=0.3, scale=0.1):
+    norm = Normalize(vmin=vmin, vmax=vmax)
+    cmap = cm.colormaps[cmap_name]
+    rgba = cmap(norm(np.clip(data, vmin, vmax)))
+    rgba[np.isnan(data)] = [0, 0, 0, 0]
+    img = (rgba * 255).astype(np.uint8)
+    # Resize to reduce file size
+    pil = Image.fromarray(img)
+    new_size = (int(pil.width * scale), int(pil.height * scale))
+    pil = pil.resize(new_size, Image.LANCZOS)
+    return pil
+
+print("🗺️ Creating lightweight map...")
+pil_img = ndvi_to_rgba_small(ndvi_change.values, scale=0.1)
+buf = BytesIO()
+pil_img.save(buf, format='PNG', optimize=True, compress_level=9)
+img_b64 = base64.b64encode(buf.getvalue()).decode()
+size_mb = len(buf.getvalue()) / 1024 / 1024
+print(f"   Image size: {size_mb:.2f} MB")
+
+bounds = [[47.1236, 7.6300], [47.2739, 7.8639]]
+
+folium.raster_layers.ImageOverlay(
+    image=f"data:image/png;base64,{img_b64}",
+    bounds=bounds,
+    opacity=0.7,
+    name="NDVI Change 2022-2023"
+).add_to(m)
+
+folium.LayerControl().add_to(m)
+
+title_html = '''
+<div style="position:fixed; top:10px; left:50px; z-index:9999;
+     background-color:white; padding:10px; border-radius:8px;
+     font-family:Arial; font-size:14px; font-weight:bold;
+     box-shadow:2px 2px 6px rgba(0,0,0,0.3);">
+    🛰️ NDVI Change Detection — Bavaria 2022 vs 2023<br>
+    <span style="color:green">■</span> Improved &nbsp;
+    <span style="color:#FFD700">■</span> Stable &nbsp;
+    <span style="color:red">■</span> Degraded
+</div>
+'''
+m.get_root().html.add_child(folium.Element(title_html))
+m.save("ndvi_interactive_map_light.html")
+print(f"✅ Lightweight map saved!")
+
+import os
+final_size = os.path.getsize("ndvi_interactive_map_light.html") / 1024 / 1024
+print(f"   Final HTML size: {final_size:.2f} MB")
