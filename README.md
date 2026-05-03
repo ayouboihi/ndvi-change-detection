@@ -102,3 +102,4 @@ python ndvi_change_detection.py
 
 **Ayoub Oihi** — Geomatics & Remote Sensing | Geospatial Data Science  
 📧 ayouboihi9@gmail.com
+🌐 https://ayouboihi.github.io/portfolio/
